@@ -23,7 +23,7 @@ def get_dict(dtype='change'):
         return swChangeDict
     else:
         swNameLevel1 = pd.read_csv(r'E:\stocks_data\sw_industry\sw_dict_level1.csv', encoding='gbk')
-        swNameCodeDict = {swNameLevel1['swName1'][dumi]: swNameLevel1['swCode1'][dumi].astype(np.int16) for dumi in range(swNameLevel1.shape[0])}
+        swNameCodeDict = {swNameLevel1['swName1'][dumi]: swNameLevel1['swCode1'][dumi] for dumi in range(swNameLevel1.shape[0])}
         swNameCodeDict[np.nan] = -1
         return swNameCodeDict
 
@@ -107,31 +107,31 @@ def update_sw_mat():
     swPath = r'E:\stocks_data\sw_industry\sw_data'
     histMatName = 'data_19901219_20170630'
     histPath = os.path.join(r'E:\bqfcts\bqfcts\data\SW_Industry','{}.mat'.format(histMatName))
-    # if not os.path.exists(histPath):
-    #     histStkNum = 3433
-    #     histDayNum = 6488
-    #     histStks = stkCodes[:histStkNum]
-    #     histTrds = trdDates[:histDayNum]
-    #     histMat = pd.DataFrame(np.zeros([histStkNum,histDayNum]).astype(np.int16),index=histStks,columns=histTrds)
-    #     firstChange = pd.read_csv(os.path.join(swPath,'sw_industry_20140102.csv'),encoding='gbk').set_index('stkcd')
-    #     for tdt in histTrds:
-    #         swData = pd.read_csv(os.path.join(swPath,'sw_industry_{}.csv'.format(tdt)),encoding='gbk').set_index('stkcd')
-    #         swCode1 = []
-    #         for stkcd in swData.index.values:
-    #             swName1 = swData.loc[stkcd, 'swName1']
-    #             swName2 = swData.loc[stkcd, 'swName2']
-    #             swCode1.append(sw_leve1_code(swName1,swName2,stkcd,firstChange))
-    #         swData['swCode1'] = swCode1
-    #         histMat.loc[swData.index,tdt] = swData['swCode1']
-    #         print(tdt)
-    #     scio.savemat(file_name=histPath, mdict={'swIndustry': histMat.values})
-    #     print('hist mat created')
+    if not os.path.exists(histPath):
+        histStkNum = 3433
+        histDayNum = 6488
+        histStks = stkCodes[:histStkNum]
+        histTrds = trdDates[:histDayNum]
+        histMat = pd.DataFrame(np.zeros([histStkNum,histDayNum]),index=histStks,columns=histTrds)
+        firstChange = pd.read_csv(os.path.join(swPath,'sw_industry_20140102.csv'),encoding='gbk').set_index('stkcd')
+        for tdt in histTrds:
+            swData = pd.read_csv(os.path.join(swPath,'sw_industry_{}.csv'.format(tdt)),encoding='gbk').set_index('stkcd')
+            swCode1 = []
+            for stkcd in swData.index.values:
+                swName1 = swData.loc[stkcd, 'swName1']
+                swName2 = swData.loc[stkcd, 'swName2']
+                swCode1.append(sw_leve1_code(swName1,swName2,stkcd,firstChange))
+            swData['swCode1'] = swCode1
+            histMat.loc[swData.index,tdt] = swData['swCode1']
+            print(tdt)
+        scio.savemat(file_name=histPath, mdict={'swIndustry': histMat.values})
+        print('hist mat created')
     currMatName = 'data_20150701_now'
     currPath = os.path.join(r'E:\bqfcts\bqfcts\data\SW_Industry', '{}.mat'.format(currMatName))
     currDayStart = 6000
     if not os.path.exists(currPath):
         currTrds = trdDates[currDayStart:]
-        currMat = pd.DataFrame(np.zeros([stkCodes.shape[0], currTrds.shape[0]]).astype(np.int16), index=stkCodes, columns=currTrds)
+        currMat = pd.DataFrame(np.zeros([stkCodes.shape[0], currTrds.shape[0]]), index=stkCodes, columns=currTrds)
         for tdt in currTrds:
             swData = pd.read_csv(os.path.join(swPath,'sw_industry_{}.csv'.format(tdt)),encoding='gbk').set_index('stkcd')
             swData['swCode1'] = swData['swName1'].map(CONSTATNS.swNameCodeDict)
@@ -150,12 +150,12 @@ def update_sw_mat():
             print('no data to update')
             return
         currTrds = currDates[currDayNum-2:]     # 前一天的重新更新，弥补新股
-        currMat = pd.DataFrame(np.zeros([currStkNum, currDayNum-savedDayNum+1]).astype(np.int16), index=stkCodes,columns=currTrds)
+        currMat = pd.DataFrame(np.zeros([currStkNum, currDayNum-savedDayNum+1]), index=stkCodes,columns=currTrds)
         for tdt in currTrds:
             swData = pd.read_csv(os.path.join(swPath, 'sw_industry_{}.csv'.format(tdt)), encoding='gbk').set_index('stkcd')
             swData['swCode1'] = swData['swName1'].map(CONSTATNS.swNameCodeDict)
             currMat.loc[swData.index, tdt] = swData['swCode1']
-        patch = np.zeros([currStkNum-savedStkNum, savedDayNum - 1]).astype(np.int16)
+        patch = np.zeros([currStkNum-savedStkNum, savedDayNum - 1])
         currMat = np.column_stack([np.row_stack([currMatSaved[:,:-1],patch]), currMat.values])
         scio.savemat(file_name=currPath, mdict={'swIndustry': currMat})
         print('curr mat updated')
