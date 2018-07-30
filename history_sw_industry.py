@@ -69,34 +69,39 @@ def history_sw_data():
         histCut.to_csv(os.path.join(r'E:\stocks_data\sw_industry\sw_data','sw_industry_{}.csv'.format(tdt)),index=False)
 
 
-def sw_leve1_code(swName1,swName2,stkcd,firstChange):
+def sw_leve1_code(swName1,swName2,stkcd,tdate,lastNoChange,firstChange):
     if swName1 in CONSTATNS.swNameCodeDict:
-        return CONSTATNS.swNameCodeDict[swName1]
-    if swName1 in CONSTATNS.swChangeDict:
+        code = CONSTATNS.swNameCodeDict[swName1]
+    elif swName1 in CONSTATNS.swChangeDict:
         if len(CONSTATNS.swChangeDict[swName1])==1:     # 一一对应，直接返回即可
-            return CONSTATNS.swNameCodeDict[CONSTATNS.swChangeDict[swName1][0]]
+            code = CONSTATNS.swNameCodeDict[CONSTATNS.swChangeDict[swName1][0]]
         else:           # 旧名 一对多 新名，
             # 先通过 二级行业进行匹配
             name2Pair = np.array([name in swName2 for name in CONSTATNS.swChangeDict[swName1]])
             if swName2 in CONSTATNS.swChangeDict[swName1]:  # 二级行业名 变更为 新一级行业名
-                return CONSTATNS.swNameCodeDict[swName2]
+                code = CONSTATNS.swNameCodeDict[swName2]
             elif swName1 == '金融服务' and swName2 != '银行':  # 非银 特殊处理
-                return CONSTATNS.swNameCodeDict['非银金融']
+                code = CONSTATNS.swNameCodeDict['非银金融']
             elif swName1 == '信息服务' and swName2=='网络服务':
-                return CONSTATNS.swNameCodeDict['计算机']
+                code = CONSTATNS.swNameCodeDict['计算机']
             elif np.any(name2Pair):  # 新一级行业 包含于 旧二级行业
-                return CONSTATNS.swNameCodeDict[CONSTATNS.swChangeDict[swName1][np.argwhere(name2Pair)[0][0]]]
+                code = CONSTATNS.swNameCodeDict[CONSTATNS.swChangeDict[swName1][np.argwhere(name2Pair)[0][0]]]
             else:   # 二级行业匹配失败，按照行业变更后 该股票所属行业
                 if stkcd in firstChange.index:       # 若该股票行业变动时还为退市，对照改名后该股票所在的行业
                     newName1 = firstChange.loc[stkcd,'swName1']
                     if newName1 in CONSTATNS.swChangeDict[swName1]:   # 变更后的行业名 处在 变更字典中
-                        return CONSTATNS.swNameCodeDict[newName1]
+                        code = CONSTATNS.swNameCodeDict[newName1]
                     else:       # 变更后股票未退市，但是该股票发生行业变更，且变更后行业 不属于变更字典，需要特殊处理
-                        return np.nan
+                        code = np.nan
                 else:   # 行业变更时 股票已经退市 匹配失败
-                    return np.nan
+                    code = np.nan
     else:   #
-        return np.nan
+        code = np.nan
+    if tdate<=20131231:         # 使变更前的行业恢复的更加均衡
+        if (stkcd in firstChange.index) and (stkcd in lastNoChange.index):
+            newName1 = firstChange.loc[stkcd, 'swName1']
+            code = CONSTATNS.swNameCodeDict[newName1] if lastNoChange.loc[stkcd,'swName1']==swName1 else code   # 与变更前对后一天相同的行业，使用变更后的代码
+    return code
 
 
 def update_sw_mat():
@@ -113,14 +118,20 @@ def update_sw_mat():
         histStks = stkCodes[:histStkNum]
         histTrds = trdDates[:histDayNum]
         histMat = pd.DataFrame(np.zeros([histStkNum,histDayNum]),index=histStks,columns=histTrds)
-        firstChange = pd.read_csv(os.path.join(swPath,'sw_industry_20140102.csv'),encoding='gbk').set_index('stkcd')
+        firstChange = pd.read_csv(os.path.join(swPath,'sw_industry_20140102.csv'), encoding='gbk').set_index('stkcd')
+        lastNoChange = pd.read_csv(os.path.join(swPath, 'sw_industry_20131231.csv'), encoding='gbk').set_index('stkcd')
         for tdt in histTrds:
             swData = pd.read_csv(os.path.join(swPath,'sw_industry_{}.csv'.format(tdt)),encoding='gbk').set_index('stkcd')
             swCode1 = []
             for stkcd in swData.index.values:
                 swName1 = swData.loc[stkcd, 'swName1']
                 swName2 = swData.loc[stkcd, 'swName2']
-                swCode1.append(sw_leve1_code(swName1,swName2,stkcd,firstChange))
+                swCode1.append(sw_leve1_code(swName1=swName1,
+                                             swName2=swName2,
+                                             stkcd=stkcd,
+                                             tdate=tdt,
+                                             lastNoChange=lastNoChange,
+                                             firstChange=firstChange))
             swData['swCode1'] = swCode1
             histMat.loc[swData.index,tdt] = swData['swCode1']
             print(tdt)
